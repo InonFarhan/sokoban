@@ -1,0 +1,16 @@
+<html>
+<link rel="stylesheet" href="css/style.css">
+
+<head>
+    <title>Sokoban</title>
+</head>
+
+<body onkeyup="handleKey(event)" onload="initGame()">
+    <p class="score">Score: <span>100</span></p>
+    <table class="board"></table>
+    <button class="restart" onclick=" initGame()">Restart</button>
+    <p class="win">You lose...</p>
+    <script src="js/sokoban.js"></script>
+</body>
+
+</html>
