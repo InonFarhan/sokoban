@@ -8,8 +8,11 @@
 <body onkeyup="handleKey(event)" onload="initGame()">
     <p class="score">Score: <span>100</span></p>
     <table class="board"></table>
-    <button class="restart" onclick=" initGame()">Restart</button>
-    <p class="win">You lose...</p>
+    <div>
+        <button class="restart" onclick=" restart()">Restart</button>
+        <button class="level" onclick="nextLevel()">Next level</button>
+    </div>
+    <p class="win">Loading...</p>
     <script src="js/sokoban.js"></script>
 </body>
 
