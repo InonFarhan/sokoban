@@ -16,6 +16,7 @@ const LOSE_SOUND = new Audio('sound/lose.mp3')
 const COMPLETE_SOUND = new Audio('sound/complete.wav')
 const GLUE_SOUND = new Audio('sound/glue.wav')
 const WALK_SOUND = new Audio('sound/walk.wav')
+const LEVEL_COMPLETE = new Audio('sound/nextlevel.wav')
 
 const GAMER_IMG = '&#128119'
 const WALL_IMG = '&#128682'
@@ -40,9 +41,9 @@ var isCounted
 var isVictory
 var isGreen
 var isRed
+var isSilent = false
 
 function initGame() {
-    var counter = 0
     isPlay = true
     isCounted = true
     isVictory = false
@@ -52,24 +53,36 @@ function initGame() {
     gGamerPos = { i: 1, j: 6 }
     gUserScore = 100
     gBoxComplete = 0
-    document.querySelector('span').innerText = gUserScore
+    changeText('.score span', gUserScore)
+    changeText('.level span', 1)
     document.querySelector('.win').style.opacity = 0
+    document.querySelector('.next').style.backgroundColor = 'black'
+    document.querySelector('.restart').style.backgroundColor = 'black'
     gBoard = buildBoard()
-    while (counter !== gLevel) {
-        counter++
-        addBoxes(gBoard)
-        addTargets(gBoard)
-    }
     renderBoard(gBoard)
+    setLevel()
     gGame = setInterval(addElements, 10000, gBoard)
 }
 
+function setLevel() {
+    var counter = 0
+    while (counter !== gBoxesCount) {
+        counter++
+        addTargets(gBoard)
+        addBoxes(gBoard)
+    }
+}
+
 function nextLevel() {
-    clearInterval(gGame)
-    isPlay = false
-    gLevel += 2
-    gBoxesCount += 2
-    initGame()
+    if (!isPlay && !isVictory) return
+    if (gLevel !== 2) {
+        gLevel++
+        clearInterval(gGame)
+        isPlay = false
+        gBoxesCount += 2
+        initGame()
+        changeText('.level span', gLevel + 1)
+    }
 }
 
 function restart() {
@@ -80,14 +93,33 @@ function restart() {
     initGame()
 }
 
+function checkIfNegsAvail(callI, cellJ, element) {
+    for (var i = callI - 1; i <= callI + 1; i++) {
+        for (var j = cellJ - 1; j <= cellJ + 1; j++) {
+            if (gBoard[i][j].type === element || gBoard[i][j].gameElement === element) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
 function addBoxes(board) {
-    var currCell = findEmptyCell(board)
-    addElement(board, currCell, BOX, BOX_IMG)
+    var isFound = false
+    while (!isFound) {
+        var emptyCell = findEmptyCell(board)
+        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, WALL)) isFound = true
+    }
+    addElement(board, emptyCell, BOX, BOX_IMG)
 }
 
 function addTargets(board) {
-    var currCell = findEmptyCell(board)
-    addElement(board, currCell, TARGET, TARGET_IMG)
+    var isFound = false
+    while (!isFound) {
+        var emptyCell = findEmptyCell(board)
+        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, TARGET) && emptyCell !== { i: 2, j: 3 }) isFound = true
+    }
+    addElement(board, emptyCell, TARGET, TARGET_IMG)
 }
 
 function renderBoard(board) {
@@ -141,15 +173,15 @@ function buildBoard() {
     board[3][3].type = WALL
     board[4][2].type = WALL
 
-    board[5][4].gameElement = TARGET
-    board[5][8].gameElement = TARGET
-    board[6][3].gameElement = TARGET
-    board[6][2].gameElement = TARGET
+    // board[5][4].gameElement = TARGET
+    // board[5][8].gameElement = TARGET
+    // board[6][3].gameElement = TARGET
+    // board[6][2].gameElement = TARGET
 
-    board[6][4].gameElement = BOX
-    board[6][6].gameElement = BOX
-    board[5][3].gameElement = BOX
-    board[3][6].gameElement = BOX
+    // board[6][4].gameElement = BOX
+    // board[6][6].gameElement = BOX
+    // board[5][3].gameElement = BOX
+    // board[3][6].gameElement = BOX
 
     board[1][6].gameElement = GAMER
 
@@ -157,108 +189,98 @@ function buildBoard() {
 }
 
 function moveTo(i, j) {
-    var nextCell
-    var currCell
-    var targetCell
     var iAbsDiff = Math.abs(i - gGamerPos.i)
     var jAbsDiff = Math.abs(j - gGamerPos.j)
+    var isDblMuve = false
+    var targetCell = gBoard[i][j]
+    var currCell
+    var cell
+    var nextCell
+    var currCell
+    var futureCell
+    var nextGmrLocation
+    var nextElmtLocation
 
     if (!isPlay) return
-    WALK_SOUND.play()
-    document.querySelector('.' + getClassName(gGamerPos)).style.backgroundColor = 'rgb(212, 166, 80)'
+    if (targetCell.type === WALL || targetCell.gameElement === BOX_COMPLETE) return
 
-    if (iAbsDiff === 2 && jAbsDiff === 0 || jAbsDiff === 2 && iAbsDiff === 0 || (iAbsDiff === 1 && jAbsDiff === 0) || (jAbsDiff === 1 && iAbsDiff === 0)) {
-        targetCell = gBoard[i][j]
+    changeCellColor(gGamerPos, 'rgb(212, 166, 80)')
 
-        if ((iAbsDiff === 1 && jAbsDiff === 0) || (jAbsDiff === 1 && iAbsDiff === 0)) {
+    if ((iAbsDiff === 2 && jAbsDiff === 0) ||
+        (jAbsDiff === 2 && iAbsDiff === 0) ||
+        (iAbsDiff === 1 && jAbsDiff === 0) ||
+        (jAbsDiff === 1 && iAbsDiff === 0)) {
+        if (!isSilent) WALK_SOUND.play()
+        // console.log('i - gGamerPos.i', i - gGamerPos.i)
+        // var diffI = i - gGamerPos.i
+        // var diffJ = j - gGamerPos.j
+        // console.log('diffJ',diffJ)
+        if (iAbsDiff === 2 || jAbsDiff === 2) isDblMuve = true
+        if (i - gGamerPos.i === 1 || i - gGamerPos.i === 2) nextCell = isDblMuve ? { i: i - 1, j } : { i: i + 1, j }
+        else if (i - gGamerPos.i === -1 || gGamerPos.i - i === 2) nextCell = isDblMuve ? { i: i + 1, j } : { i: i - 1, j }
+        else if (j - gGamerPos.j === 1 || j - gGamerPos.j === 2) nextCell = isDblMuve ? { i, j: j - 1 } : { i, j: j + 1 }
+        else if (j - gGamerPos.j === -1 || gGamerPos.j - j === 2) nextCell = isDblMuve ? { i, j: j + 1 } : { i, j: j - 1 }
+        // var nextCellPos = {
+        //     i: i +diffI
+        // }
 
-            if (targetCell.type === WALL || targetCell.gameElement === TARGET || targetCell.gameElement === BOX_COMPLETE) return
+        cell = gBoard[nextCell.i][nextCell.j]
+        currCell = isDblMuve ? cell : targetCell
+        futureCell = isDblMuve ? targetCell : cell
+        nextElmtLocation = isDblMuve ? { i, j } : nextCell
+        nextGmrLocation = isDblMuve ? nextCell : { i, j }
 
-            if (i - gGamerPos.i === 1) {
-                nextCell = gBoard[i + 1][j]
-                currCell = { i: i + 1, j }
-            } else if (gGamerPos.i - i === 1) {
-                nextCell = gBoard[i - 1][j]
-                currCell = { i: i - 1, j }
-            } else if (j - gGamerPos.j === 1) {
-                nextCell = gBoard[i][j + 1]
-                currCell = { i, j: j + 1 }
-            } else if (gGamerPos.j - j === 1) {
-                nextCell = gBoard[i][j - 1]
-                currCell = { i, j: j - 1 }
-            }
-            if (targetCell.gameElement === BOX) {
-                if (nextCell.type === WALL || nextCell.gameElement === BOX || nextCell.gameElement === GOLD || nextCell.gameElement === GLUE || nextCell.gameElement === CLOCK || nextCell.gameElement === BOX_COMPLETE) return
+        if (!isDblMuve && targetCell.gameElement === TARGET) return
+        if (currCell.gameElement === BOX) {
+            if (futureCell.gameElement === BOX_COMPLETE || futureCell.type !== FLOOR || futureCell.gameElement === BOX) return
+            if (futureCell.gameElement === null) {
+                addElement(gBoard, nextElmtLocation, BOX, BOX_IMG)
+            } else if (futureCell.gameElement === TARGET) {
+                if (!isSilent) COMPLETE_SOUND.play()
+                addElement(gBoard, nextElmtLocation, BOX_COMPLETE, BOX_COMPLETE_IMG)
+                gBoxComplete++
+            } else if (futureCell.gameElement === GLUE || futureCell.gameElement === GOLD || futureCell.gameElement === CLOCK) return
+        }
+        else if (currCell.gameElement === GLUE) meetGlue()
+        else if (currCell.gameElement === GOLD) meetGold()
+        else if (currCell.gameElement === CLOCK) meetClock()
+        else if (isDblMuve && currCell.gameElement === null) return
 
-                if (nextCell.gameElement === null) {
-                    nextCell.gameElement = BOX
-                    renderCell(currCell, BOX_IMG)
+        gBoard[gGamerPos.i][gGamerPos.j].gameElement = null
+        renderCell(gGamerPos, '')
+        gGamerPos.i = isDblMuve ? nextCell.i : i
+        gGamerPos.j = isDblMuve ? nextCell.j : j
+        renderCell(nextGmrLocation, GAMER_IMG)
+        gBoard[gGamerPos.i][gGamerPos.j].gameElement = GAMER
 
-                } else if (nextCell.gameElement === TARGET) {
-                    addElement(gBoard, currCell, BOX_COMPLETE, BOX_COMPLETE_IMG)
-                    COMPLETE_SOUND.play()
-                    gBoxComplete++
-                }
-            } else if (targetCell.gameElement === CLOCK) meetClock()
-            else if (targetCell.gameElement === GOLD) meetGold()
-            else if (targetCell.gameElement === GLUE) meetGlue()
-            renderCell(gGamerPos, '')
-
-            gGamerPos.i = i
-            gGamerPos.j = j
-            gBoard[gGamerPos.i][gGamerPos.j].gameElement = GAMER
-            renderCell(gGamerPos, GAMER_IMG)
-
-        } else if (iAbsDiff === 2 && jAbsDiff === 0 || jAbsDiff === 2 && iAbsDiff === 0) {
-
-            if (targetCell.gameElement === null || targetCell.gameElement === TARGET) {
-
-                if (i - gGamerPos.i === 2) {
-                    nextCell = gBoard[i - 1][j]
-                    currCell = { i: i - 1, j }
-                } else if (gGamerPos.i - i === 2) {
-                    nextCell = gBoard[i + 1][j]
-                    currCell = { i: i + 1, j }
-                } else if (j - gGamerPos.j === 2) {
-                    nextCell = gBoard[i][j - 1]
-                    currCell = { i, j: j - 1 }
-                } else if (gGamerPos.j - j === 2) {
-                    nextCell = gBoard[i][j + 1]
-                    currCell = { i, j: j + 1 }
-                }
-
-                if (nextCell.gameElement === null) return
-                if (nextCell.gameElement === BOX) {
-                    if (targetCell.gameElement === GOLD || nextCell.gameElement === GLUE || nextCell.gameElement === CLOCK) return
-
-                    if (targetCell.gameElement === null) {
-                        targetCell.gameElement = BOX
-                        renderCell({ i, j }, BOX_IMG)
-                    } else if (targetCell.gameElement === TARGET) {
-                        addElement(gBoard, { i, j }, BOX_COMPLETE, BOX_COMPLETE_IMG)
-                        gBoxComplete++
-                    }
-                }
-                renderCell(gGamerPos, '')
-                gGamerPos.i = currCell.i
-                gGamerPos.j = currCell.j
-                gBoard[gGamerPos.i][gGamerPos.j].gameElement = GAMER
-                renderCell(gGamerPos, GAMER_IMG)
-
-            }
+        if (isGreen) changeCellColor(gGamerPos, 'yellowgreen')
+        else if (isRed) changeCellColor(gGamerPos, 'red')
+        if (!isCounted) gWalkCount++
+        if (isCounted) gUserScore--
+        if (gWalkCount === 10) {
+            isCounted = true
+            gWalkCount = 0
+            isGreen = false
         }
     }
-    if (!isCounted) gWalkCount++
-    if (isGreen) document.querySelector('.' + getClassName(gGamerPos)).style.backgroundColor = 'yellowgreen'
-    else if (isRed) document.querySelector('.' + getClassName(gGamerPos)).style.backgroundColor = 'red'
-    if (isCounted) gUserScore--
-    if (gWalkCount === 10) {
-        isCounted = true
-        gWalkCount = 0
-        isGreen = false
-    }
-    document.querySelector('span').innerText = gUserScore
+    changeText('span', gUserScore)
     if (checkIfVictory()) gameOver()
+}
+
+function checkMove(nextCell, element) {
+    if (nextCell.type === element || nextCell.gameElement === element) return false
+    return true
+}
+
+function silent() {
+    if (!isSilent) {
+        isSilent = true
+        document.querySelector('.silent').innerHTML = '&#128263'
+    }
+    else {
+        isSilent = false
+        document.querySelector('.silent').innerHTML = '&#128266'
+    }
 }
 
 function meetClock() {
@@ -285,13 +307,25 @@ function meetGold() {
 }
 
 function gameOver() {
-    document.querySelector('.win').innerText = 'You lose...'
     isPlay = false
     clearInterval(gGame)
-    if (!isVictory) LOSE_SOUND.play()
-    if (isVictory) {
-        document.querySelector('.win').innerText = 'You win!'
-        WIN_SOUND.play()
+    if (!isVictory) {
+        if (!isSilent) LOSE_SOUND.play()
+        document.querySelector('.win').innerText = 'You lose...'
+        document.querySelector('.restart').style.backgroundColor = 'green'
+        document.querySelector('.restart').style.transition = '1s'
+    } else if (isVictory) {
+        if (gLevel < 2) {
+            if (!isSilent) setTimeout(() => { LEVEL_COMPLETE.play() }, 500)
+            document.querySelector('.next').style.backgroundColor = 'green'
+            document.querySelector('.next').style.transition = '1s'
+            document.querySelector('.win').innerText = 'Good job!'
+        } else if (gLevel === 2) {
+            if (!isSilent) WIN_SOUND.play()
+            document.querySelector('.restart').style.backgroundColor = 'green'
+            document.querySelector('.next').style.transition = '1s'
+            document.querySelector('.win').innerText = 'You win!'
+        }
     }
     document.querySelector('.win').style.opacity = 1
 }
@@ -358,6 +392,15 @@ function renderCell(location, value) {
     document.querySelector(cellSelector).innerHTML = value
 }
 
+function changeCellColor(location, color) {
+    var cellSelector = '.' + getClassName(location)
+    document.querySelector(cellSelector).style.backgroundColor = color
+}
+
+function changeText(location, newText) {
+    document.querySelector(location).innerText = newText
+}
+
 function getClassName(location) {
     var cellClass = 'cell-' + location.i + '-' + location.j;
     return cellClass;
@@ -388,9 +431,9 @@ function handleKey(event) {
 
 function findEmptyCell(board) {
     var emptyCells = []
-    for (var i = 0; i < board.length; i++) {
-        for (var j = 0; j < board[i].length; j++) {
-            if (board[i][j].type !== WALL && board[i][j].gameElement !== GAMER && board[i][j].gameElement !== TARGET && board[i][j].gameElement !== BOX_COMPLETE && board[i][j].gameElement !== BOX && board[i][j].gameElement !== GLUE && board[i][j].gameElement !== GOLD && board[i][j].gameElement !== CLOCK && i !== 1 && i !== board.length - 2 && j !== 1 && j !== board[i].length - 2) emptyCells.push({ i, j })
+    for (var i = 1; i < board.length - 1; i++) {
+        for (var j = 1; j < board[i].length - 1; j++) {
+            if (board[i][j].type !== WALL && board[i][j].gameElement === null) emptyCells.push({ i, j })
         }
     }
     return emptyCells[getRandomInt(0, emptyCells.length)]
@@ -401,209 +444,3 @@ function getRandomInt(min, max) {
     max = Math.floor(max)
     return Math.floor(Math.random() * (max - min) + min)
 }
-
-// function moveTo(i, j) {
-//     if (isPlay) {
-//         userScore--
-//         var nextCell
-//         var iAbsDiff = Math.abs(i - gGamerPos.i)
-//         var jAbsDiff = Math.abs(j - gGamerPos.j)
-
-//         if (iAbsDiff === 2 && jAbsDiff === 0 || jAbsDiff === 2 && iAbsDiff === 0) {
-//             if (i - gGamerPos.i === 2) {
-//                 nextCell = gBoard[i][j]
-//                 if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                 else if (nextCell.gameElement === TARGET && gBoard[i - 1][j].gameElement === BOX) {
-
-//                     gBoard[i - 1][j].gameElement === GAMER
-//                     renderCell({ i: i - 1, j }, GAMER_IMG)
-
-//                     nextCell.gameElement === BOX_COMPLETE
-//                     renderCell({ i, j }, BOX_COMPLETE_IMG)
-
-//                     gBoard[i - 1][j].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i - 1
-//                     gGamerPos.j = j
-
-//                     gBoxComplete++
-// } else if (nextCell.gameElement === null && gBoard[i - 1][j].gameElement === BOX) {
-
-//     nextCell.gameElement = BOX
-//     renderCell({ i, j }, BOX_IMG)
-
-//     gBoard[i - 1][j].gameElement === GAMER
-//     renderCell({ i: i - 1, j }, GAMER_IMG)
-
-//     gBoard[i - 1][j].gameElement = GAMER
-//     renderCell(gGamerPos, '')
-//     gGamerPos.i = i - 1
-//     gGamerPos.j = j
-// }
-//             } else if (gGamerPos.i - i === 2) {
-//                 nextCell = gBoard[i][j]
-//                 if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                 else if (nextCell.gameElement === TARGET && gBoard[i + 1][j].gameElement === BOX) {
-
-//                     gBoard[i + 1][j].gameElement === GAMER
-//                     renderCell({ i: i + 1, j }, GAMER_IMG)
-
-//                     nextCell.gameElement === BOX_COMPLETE
-//                     renderCell({ i, j }, BOX_COMPLETE_IMG)
-
-//                     gBoard[i - 1][j].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i + 1
-//                     gGamerPos.j = j
-
-//                     gBoxComplete++
-//                 } else if (nextCell.gameElement === null && gBoard[i + 1][j].gameElement === BOX) {
-//                     nextCell.gameElement = BOX
-//                     renderCell({ i, j }, BOX_IMG)
-
-//                     gBoard[i + 1][j].gameElement === GAMER
-//                     renderCell({ i: i + 1, j }, GAMER_IMG)
-
-//                     gBoard[i + 1][j].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i + 1
-//                     gGamerPos.j = j
-//                 }
-//             }
-//             else if (j - gGamerPos.j === 2) {
-//                 nextCell = gBoard[i][j]
-//                 if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                 else if (nextCell.gameElement === TARGET && gBoard[i][j - 1].gameElement === BOX) {
-
-//                     gBoard[i][j - 1].gameElement === GAMER
-//                     renderCell({ i, j: j - 1 }, GAMER_IMG)
-
-//                     nextCell.gameElement === BOX_COMPLETE
-//                     renderCell({ i, j }, BOX_COMPLETE_IMG)
-
-//                     gBoard[i][j - 1].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i
-//                     gGamerPos.j = j - 1
-
-//                     gBoxComplete++
-//                 }
-//                 else if (nextCell.gameElement === null && gBoard[i][j - 1].gameElement === BOX) {
-
-//                     nextCell.gameElement = BOX
-//                     renderCell({ i, j }, BOX_IMG)
-
-//                     gBoard[i][j - 1].gameElement === GAMER
-//                     renderCell({ i, j: j - 1 }, GAMER_IMG)
-
-//                     gBoard[i][j - 1].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i
-//                     gGamerPos.j = j - 1
-//                 }
-//             } else if (gGamerPos.j - j === 2) {
-//                 nextCell = gBoard[i][j]
-//                 if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                 else if (nextCell.gameElement === TARGET && gBoard[i][j + 1].gameElement === BOX) {
-
-//                     gBoard[i][j - 1].gameElement === GAMER
-//                     renderCell({ i, j: j + 1 }, GAMER_IMG)
-
-//                     nextCell.gameElement === BOX_COMPLETE
-//                     renderCell({ i, j }, BOX_COMPLETE_IMG)
-
-//                     gBoard[i][j + 1].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i
-//                     gGamerPos.j = j + 1
-
-//                     gBoxComplete++
-//                 }
-//                 else if (nextCell.gameElement === null && gBoard[i][j + 1].gameElement === BOX) {
-
-//                     nextCell.gameElement = BOX
-//                     renderCell({ i, j }, BOX_IMG)
-
-//                     gBoard[i][j - 1].gameElement === GAMER
-//                     renderCell({ i, j: j + 1 }, GAMER_IMG)
-
-//                     gBoard[i][j + 1].gameElement = GAMER
-//                     renderCell(gGamerPos, '')
-//                     gGamerPos.i = i
-//                     gGamerPos.j = j + 1
-//                 }
-//             }
-//         } else if ((iAbsDiff === 1 && jAbsDiff === 0) || (jAbsDiff === 1 && iAbsDiff === 0)) {
-
-//             var targetCell = gBoard[i][j]
-//             if (targetCell.type === WALL) return
-//             else if (targetCell.gameElement === TARGET) return
-//             else if (targetCell.gameElement === BOX_COMPLETE) return
-
-//             gBoard[gGamerPos.i][gGamerPos.j].type = FLOOR
-
-//             if (targetCell.gameElement === BOX) {
-//                 targetCell.gameElement === GAMER
-
-//                 if (i - gGamerPos.i === 1) {
-//                     nextCell = gBoard[i + 1][j]
-//                     if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                     else if (nextCell.gameElement === TARGET) {
-//                         nextCell.gameElement === BOX_COMPLETE
-//                         renderCell({ i: i + 1, j }, BOX_COMPLETE_IMG)
-//                         gBoxComplete++
-//                     }
-//                     else {
-//                         nextCell.gameElement = BOX
-//                         renderCell({ i: i + 1, j }, BOX_IMG)
-//                     }
-//                 } else if (gGamerPos.i - i === 1) {
-//                     nextCell = gBoard[i - 1][j]
-//                     if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                     else if (nextCell.gameElement === TARGET) {
-//                         nextCell.gameElement === BOX_COMPLETE
-//                         renderCell({ i: i - 1, j }, BOX_COMPLETE_IMG)
-//                         gBoxComplete++
-//                     }
-//                     else {
-//                         nextCell.gameElement = BOX
-//                         renderCell({ i: i - 1, j }, BOX_IMG)
-//                     }
-//                 } else if (j - gGamerPos.j === 1) {
-//                     nextCell = gBoard[i][j + 1]
-//                     if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                     else if (nextCell.gameElement === TARGET) {
-//                         nextCell.gameElement === BOX_COMPLETE
-//                         renderCell({ i, j: j + 1 }, BOX_COMPLETE_IMG)
-//                         gBoxComplete++
-//                     }
-//                     else {
-//                         nextCell.gameElement = BOX
-//                         renderCell({ i, j: j + 1 }, BOX_IMG)
-//                     }
-//                 } else if (gGamerPos.j - j === 1) {
-//                     nextCell = gBoard[i][j - 1]
-//                     if (nextCell.type === WALL || nextCell.gameElement === BOX) return
-//                     else if (nextCell.gameElement === TARGET) {
-//                         nextCell.gameElement === BOX_COMPLETE
-//                         renderCell({ i, j: j - 1 }, BOX_COMPLETE_IMG)
-//                         gBoxComplete++
-//                     }
-//                     else {
-//                         nextCell.gameElement = BOX
-//                         renderCell({ i, j: j - 1 }, BOX_IMG)
-//                     }
-//                 }
-
-//             }
-//             renderCell(gGamerPos, '')
-
-//             gGamerPos.i = i
-//             gGamerPos.j = j
-//             gBoard[gGamerPos.i][gGamerPos.j].gameElement = GAMER
-//             renderCell(gGamerPos, GAMER_IMG)
-//         }
-//     }
-//     document.querySelector('span').innerText = userScore
-//     if (checkIfVictory()) gameOver()
-// }

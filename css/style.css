@@ -5,14 +5,23 @@
 
 body {
     background-color: rgb(105, 53, 53);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.counter {
+    display: flex;
+    flex-direction: row;
+    margin: 0px;
 }
 
 .board {
     margin-top: 20px;
     background-color: black;
     color: white;
-    width: 700px;
-    height: 700px;
+    width: 600px;
+    height: 600px;
 }
 
 .floor {
@@ -44,8 +53,10 @@ button:hover {
 }
 
 .win {
+    transition: 1s;
     color: azure;
-    margin-top: 10px;
+    margin-top: 5px;
+    margin-bottom: 5px;
     font-size: xx-large;
 }
 
@@ -53,5 +64,27 @@ button:hover {
     margin-top: 10px;
     font-size: xx-large;
     color: aliceblue;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+}
+
+.score span {
     font-family: 'Courier New', Courier, monospace;
+}
+
+.level {
+    margin-top: 10px;
+    font-size: xx-large;
+    color: aliceblue;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+}
+
+.level span {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.silent {
+    border-radius: 25%;
+    position: absolute;
+    top: 0;
+    right: 10;
 }
