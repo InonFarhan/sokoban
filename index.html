@@ -5,7 +5,7 @@
     <title>Sokoban</title>
 </head>
 
-<body onkeyup="handleKey(event)" onload="initGame()">
+<body onkeydown="handleKey(event)" onload="initGame()">
     <div class="counter">
         <p class="score">Score: <span>100</span></p>
         <p class="level">Level: <span>1</span></p>
@@ -15,6 +15,12 @@
     <div>
         <button class="restart" onclick=" restart()">Restart</button>
         <button class="next" onclick="nextLevel()">Next level</button>
+        <button class="undo" onclick="undo()">Undo</button>
+        <select onclick="boardSize(value)" class="board-size-select" id="board-size-select">
+            <option value="s">Board: Clear</option>
+            <option value="m">Board: Complicated</option>
+            <option value="xl">Board: unclear</option>
+        </select>
     </div>
     <button class="silent" onclick="silent()">&#128266</button>
     <p class="win">Loading...</p>

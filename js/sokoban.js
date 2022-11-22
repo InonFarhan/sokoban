@@ -28,19 +28,24 @@ const GOLD_IMG = '&#128176'
 const GLUE_IMG = '&#127852'
 
 var gWalkCount
-var gUserScore
+var gUserScore = 100
 var gBoard
 var gBoxComplete
 var gGamerPos
 var gBoxesCount = 4
 var gLevel = 0
 var gGame
+var gPrevBoards
+var gSizeBoard = 11
+var gSlctdOptnCount
 
 var isPlay
 var isCounted
 var isVictory
 var isGreen
 var isRed
+var isBoardChanged
+var isUndo = false
 var isSilent = false
 
 function initGame() {
@@ -49,16 +54,18 @@ function initGame() {
     isVictory = false
     isGreen = false
     isRed = false
+    isBoardChanged = false
+    gPrevBoards = []
     gWalkCount = 0
     gGamerPos = { i: 1, j: 6 }
-    gUserScore = 100
     gBoxComplete = 0
+    gSlctdOptnCount = 0
     changeText('.score span', gUserScore)
     changeText('.level span', 1)
     document.querySelector('.win').style.opacity = 0
     document.querySelector('.next').style.backgroundColor = 'black'
     document.querySelector('.restart').style.backgroundColor = 'black'
-    gBoard = buildBoard()
+    gBoard = buildBoard(createMat(gSizeBoard, gSizeBoard))
     renderBoard(gBoard)
     setLevel()
     gGame = setInterval(addElements, 10000, gBoard)
@@ -69,19 +76,42 @@ function setLevel() {
     while (counter !== gBoxesCount) {
         counter++
         addTargets(gBoard)
-        addBoxes(gBoard)
+        setTimeout(addBoxes, 50, gBoard)
     }
+}
+
+function boardSize(size) {
+    gSlctdOptnCount++
+    if (gSlctdOptnCount < 2 || !isPlay) return
+    changeButtonColor('.restart', 'black')
+    if (size === 's') {
+        gSizeBoard = 11
+        gUserScore = 100
+    }
+    else if (size === 'm') {
+        gSizeBoard = 15
+        gUserScore = 180
+    }
+    else if (size === 'xl') {
+        gSizeBoard = 20
+        gUserScore = 250
+    }
+    gSlctdOptnCount = 0
+    clearInterval(gGame)
+    isBoardChanged = true
+    changeButtonColor('.restart', 'green')
 }
 
 function nextLevel() {
     if (!isPlay && !isVictory) return
-    if (gLevel !== 2) {
+    if (isBoardChanged) return
+    if (gLevel !== 2 && isVictory) {
         gLevel++
         clearInterval(gGame)
         isPlay = false
         gBoxesCount += 2
-        initGame()
         changeText('.level span', gLevel + 1)
+        initGame()
     }
 }
 
@@ -95,10 +125,10 @@ function restart() {
 
 function checkIfNegsAvail(callI, cellJ, element) {
     for (var i = callI - 1; i <= callI + 1; i++) {
+        if (i < 0 || i > gBoard.length - 1) continue
         for (var j = cellJ - 1; j <= cellJ + 1; j++) {
-            if (gBoard[i][j].type === element || gBoard[i][j].gameElement === element) {
-                return false
-            }
+            if (j < 0 || j > gBoard.length - 1) continue
+            if (gBoard[i][j].type === element || gBoard[i][j].gameElement === element) return false
         }
     }
     return true
@@ -108,7 +138,7 @@ function addBoxes(board) {
     var isFound = false
     while (!isFound) {
         var emptyCell = findEmptyCell(board)
-        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, WALL)) isFound = true
+        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, WALL) && checkIfNegsAvail(emptyCell.i, emptyCell.j, BOX)) isFound = true
     }
     addElement(board, emptyCell, BOX, BOX_IMG)
 }
@@ -117,7 +147,7 @@ function addTargets(board) {
     var isFound = false
     while (!isFound) {
         var emptyCell = findEmptyCell(board)
-        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, TARGET) && emptyCell !== { i: 2, j: 3 }) isFound = true
+        if (checkIfNegsAvail(emptyCell.i, emptyCell.j, TARGET)) isFound = true
     }
     addElement(board, emptyCell, TARGET, TARGET_IMG)
 }
@@ -150,8 +180,7 @@ function renderBoard(board) {
     elBoard.innerHTML = strHTML
 }
 
-function buildBoard() {
-    var board = createMat(10, 10)
+function buildBoard(board) {
     for (var i = 0; i < board.length; i++) {
         for (var j = 0; j < board[i].length; j++) {
             board[i][j] = {
@@ -160,29 +189,18 @@ function buildBoard() {
             }
         }
     }
-    for (var I = 0; I < board.length; I++) {
-        board[0][I].type = WALL
-        board[board.length - 1][I].type = WALL
-        board[I][board[0].length - 1].type = WALL
-        board[I][0].type = WALL
+    for (var i = 0; i < board.length; i++) {
+        board[0][i].type = WALL
+        board[board.length - 1][i].type = WALL
+        board[i][board[0].length - 1].type = WALL
+        board[i][0].type = WALL
     }
 
-    board[2][1].type = WALL
-    board[2][2].type = WALL
-    board[3][2].type = WALL
-    board[3][3].type = WALL
-    board[4][2].type = WALL
-
-    // board[5][4].gameElement = TARGET
-    // board[5][8].gameElement = TARGET
-    // board[6][3].gameElement = TARGET
-    // board[6][2].gameElement = TARGET
-
-    // board[6][4].gameElement = BOX
-    // board[6][6].gameElement = BOX
-    // board[5][3].gameElement = BOX
-    // board[3][6].gameElement = BOX
-
+    board[5][1].type = WALL
+    board[5][2].type = WALL
+    board[5][3].type = WALL
+    board[5][4].type = WALL
+    board[6][4].type = WALL
     board[1][6].gameElement = GAMER
 
     return board
@@ -204,6 +222,7 @@ function moveTo(i, j) {
     if (!isPlay) return
     if (targetCell.type === WALL || targetCell.gameElement === BOX_COMPLETE) return
 
+    if (!isUndo) gPrevBoards.push(copyMat(gBoard))
     changeCellColor(gGamerPos, 'rgb(212, 166, 80)')
 
     if ((iAbsDiff === 2 && jAbsDiff === 0) ||
@@ -211,18 +230,12 @@ function moveTo(i, j) {
         (iAbsDiff === 1 && jAbsDiff === 0) ||
         (jAbsDiff === 1 && iAbsDiff === 0)) {
         if (!isSilent) WALK_SOUND.play()
-        // console.log('i - gGamerPos.i', i - gGamerPos.i)
-        // var diffI = i - gGamerPos.i
-        // var diffJ = j - gGamerPos.j
-        // console.log('diffJ',diffJ)
+
         if (iAbsDiff === 2 || jAbsDiff === 2) isDblMuve = true
         if (i - gGamerPos.i === 1 || i - gGamerPos.i === 2) nextCell = isDblMuve ? { i: i - 1, j } : { i: i + 1, j }
         else if (i - gGamerPos.i === -1 || gGamerPos.i - i === 2) nextCell = isDblMuve ? { i: i + 1, j } : { i: i - 1, j }
         else if (j - gGamerPos.j === 1 || j - gGamerPos.j === 2) nextCell = isDblMuve ? { i, j: j - 1 } : { i, j: j + 1 }
         else if (j - gGamerPos.j === -1 || gGamerPos.j - j === 2) nextCell = isDblMuve ? { i, j: j + 1 } : { i, j: j - 1 }
-        // var nextCellPos = {
-        //     i: i +diffI
-        // }
 
         cell = gBoard[nextCell.i][nextCell.j]
         currCell = isDblMuve ? cell : targetCell
@@ -283,13 +296,39 @@ function silent() {
     }
 }
 
+function undo() {
+    if (isBoardChanged) return
+    if (!gPrevBoards.length || !isPlay) {
+        changeButtonColor('.undo', 'red')
+    } else {
+        isUndo = true
+        gBoxComplete = 0
+        gUserScore++
+        changeText('span', gUserScore)
+        changeButtonColor('.undo', 'green')
+        var currBoard = gPrevBoards[gPrevBoards.length - 1]
+        for (var i = 0; i < currBoard.length; i++) {
+            for (var j = 0; j < currBoard[i].length; j++) {
+                if (currBoard[i][j].gameElement === GAMER) gGamerPos = { i, j }
+                else if (currBoard[i][j].gameElement === GLUE || currBoard[i][j].gameElement === GOLD || currBoard[i][j].gameElement === CLOCK) currBoard[i][j].gameElement === null
+                else if (currBoard[i][j].gameElement === BOX_COMPLETE) gBoxComplete++
+            }
+        }
+        gBoard = currBoard
+        renderBoard(gBoard)
+        gPrevBoards.splice(gPrevBoards.indexOf(currBoard), 1)
+    }
+    isUndo = false
+    setTimeout(changeButtonColor, 500, '.undo', 'black')
+}
+
 function meetClock() {
     isCounted = false
     isGreen = true
 }
 
 function meetGlue() {
-    GLUE_SOUND.play()
+    if (!isSilent) GLUE_SOUND.play()
     isGreen = false
     gUserScore -= 5
     isPlay = false
@@ -312,17 +351,17 @@ function gameOver() {
     if (!isVictory) {
         if (!isSilent) LOSE_SOUND.play()
         document.querySelector('.win').innerText = 'You lose...'
-        document.querySelector('.restart').style.backgroundColor = 'green'
+        changeButtonColor('.restart', 'green')
         document.querySelector('.restart').style.transition = '1s'
     } else if (isVictory) {
         if (gLevel < 2) {
             if (!isSilent) setTimeout(() => { LEVEL_COMPLETE.play() }, 500)
-            document.querySelector('.next').style.backgroundColor = 'green'
+            changeButtonColor('.next', 'green')
             document.querySelector('.next').style.transition = '1s'
             document.querySelector('.win').innerText = 'Good job!'
         } else if (gLevel === 2) {
             if (!isSilent) WIN_SOUND.play()
-            document.querySelector('.restart').style.backgroundColor = 'green'
+            changeButtonColor('.restart', 'green')
             document.querySelector('.next').style.transition = '1s'
             document.querySelector('.win').innerText = 'You win!'
         }
@@ -397,6 +436,10 @@ function changeCellColor(location, color) {
     document.querySelector(cellSelector).style.backgroundColor = color
 }
 
+function changeButtonColor(button, color) {
+    document.querySelector(button).style.backgroundColor = color
+}
+
 function changeText(location, newText) {
     document.querySelector(location).innerText = newText
 }
@@ -437,6 +480,17 @@ function findEmptyCell(board) {
         }
     }
     return emptyCells[getRandomInt(0, emptyCells.length)]
+}
+
+function copyMat(board) {
+    var newMat = []
+    for (var i = 0; i < board.length; i++) {
+        newMat[i] = []
+        for (var j = 0; j < board[i].length; j++) {
+            newMat[i][j] = { ...board[i][j] }
+        }
+    }
+    return newMat
 }
 
 function getRandomInt(min, max) {

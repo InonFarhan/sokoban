@@ -39,7 +39,7 @@ body {
 
 button {
     font-family: 'Courier New', Courier, monospace;
-    margin-top: 20px;
+    margin-top: 5px;
     background-color: black;
     color: whitesmoke;
     width: auto;
@@ -87,4 +87,14 @@ button:hover {
     position: absolute;
     top: 0;
     right: 10;
+}
+
+.board-size-select {
+    font-family: 'Courier New', Courier, monospace;
+    margin-top: 5px;
+    background-color: black;
+    color: whitesmoke;
+    width: auto;
+    height: 25px;
+    border-radius: 10%;
 }
